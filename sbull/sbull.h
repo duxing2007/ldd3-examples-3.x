@@ -65,7 +65,7 @@ typedef struct Sbull_Dev {
    spinlock_t lock;
    u8 *data;
 #ifdef SBULL_MULTIQUEUE
-   request_queue_t *queue;
+   struct request_queue *queue;
    int busy;
 #endif
 }              Sbull_Dev;
