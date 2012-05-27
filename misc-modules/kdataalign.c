@@ -14,7 +14,6 @@
  * we cannot take responsibility for errors or fitness for use.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>

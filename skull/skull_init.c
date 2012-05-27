@@ -20,7 +20,6 @@
 
 /* jc: cleaned up, but not yet run for anything */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/moduleparam.h>
