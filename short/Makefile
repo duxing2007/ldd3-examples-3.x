@@ -2,15 +2,15 @@
 #DEBUG = y
 
 
-# Add your debugging flag (or not) to CFLAGS
+# Add your debugging flag (or not) to EXTRA_CFlAGS
 ifeq ($(DEBUG),y)
   DEBFLAGS = -O -g -DSHORT_DEBUG # "-O" is needed to expand inlines
 else
   DEBFLAGS = -O2
 endif
 
-CFLAGS += $(DEBFLAGS)
-CFLAGS += -I..
+EXTRA_CFlAGS += $(DEBFLAGS)
+EXTRA_CFlAGS += -I..
 
 ifneq ($(KERNELRELEASE),)
 # call from kernel build system
@@ -32,7 +32,7 @@ clean:
 	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions
 
 depend .depend dep:
-	$(CC) $(CFLAGS) -M *.c > .depend
+	$(CC) $(EXTRA_CFlAGS) -M *.c > .depend
 
 
 ifeq (.depend,$(wildcard .depend))

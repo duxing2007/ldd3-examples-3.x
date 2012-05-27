@@ -1,13 +1,13 @@
 # Comment/uncomment the following line to disable/enable debugging
 #DEBUG = y
 
-# Add your debugging flag (or not) to CFLAGS
+# Add your debugging flag (or not) to EXTRA_CFlAGS
 ifeq ($(DEBUG),y)
   DEBFLAGS = -O -g # "-O" is needed to expand inlines
 else
   DEBFLAGS = -O2
 endif
-CFLAGS  += $(DEBFLAGS) -I$(LDDINCDIR)
+EXTRA_CFlAGS  += $(DEBFLAGS) -I$(LDDINCDIR)
 
 
 ifneq ($(KERNELRELEASE),)
@@ -31,7 +31,7 @@ clean:
 	rm -rf *.o *.ko *~ core .depend *.mod.c .*.cmd .tmp_versions .*.o.d
 
 depend .depend dep:
-	$(CC) $(CFLAGS) -M *.c > .depend
+	$(CC) $(EXTRA_CFlAGS) -M *.c > .depend
 
 
 ifeq (.depend,$(wildcard .depend))
