@@ -134,9 +134,9 @@ static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
 	/* Do each segment independently. */
 	bio_for_each_segment(bvec, bio, i) {
 		char *buffer = __bio_kmap_atomic(bio, i, KM_USER0);
-		sbull_transfer(dev, sector, bio_cur_bytes(bio)<<KERNEL_SECTOR_SHIFT,
+		sbull_transfer(dev, sector, bio_cur_bytes(bio)>>KERNEL_SECTOR_SHIFT,
 				buffer, bio_data_dir(bio) == WRITE);
-		sector += (bio_cur_bytes(bio)<<KERNEL_SECTOR_SHIFT);
+		sector += (bio_cur_bytes(bio)>>KERNEL_SECTOR_SHIFT);
 		__bio_kunmap_atomic(bio, KM_USER0);
 	}
 	return 0; /* Always "succeed" */
