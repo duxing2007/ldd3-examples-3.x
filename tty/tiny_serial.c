@@ -44,7 +44,7 @@ MODULE_LICENSE("GPL");
 
 static struct timer_list *timer;
 
-static void tiny_stop_tx(struct uart_port *port, unsigned int tty_stop)
+static void tiny_stop_tx(struct uart_port *port)
 {
 }
 
@@ -58,7 +58,7 @@ static void tiny_enable_ms(struct uart_port *port)
 
 static void tiny_tx_chars(struct uart_port *port)
 {
-	struct circ_buf *xmit = &port->info->xmit;
+	struct circ_buf *xmit = &port->state->xmit;
 	int count;
 
 	if (port->x_char) {
@@ -68,7 +68,7 @@ static void tiny_tx_chars(struct uart_port *port)
 		return;
 	}
 	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
-		tiny_stop_tx(port, 0);
+		tiny_stop_tx(port);
 		return;
 	}
 
@@ -85,10 +85,10 @@ static void tiny_tx_chars(struct uart_port *port)
 		uart_write_wakeup(port);
 
 	if (uart_circ_empty(xmit))
-		tiny_stop_tx(port, 0);
+		tiny_stop_tx(port);
 }
 
-static void tiny_start_tx(struct uart_port *port, unsigned int tty_start)
+static void tiny_start_tx(struct uart_port *port)
 {
 }
 
@@ -101,9 +101,9 @@ static void tiny_timer(unsigned long data)
 	port = (struct uart_port *)data;
 	if (!port)
 		return;
-	if (!port->info)
+	if (!port->state)
 		return;
-	tty = port->info->tty;
+	tty = port->state->port.tty;
 	if (!tty)
 		return;
 
@@ -140,7 +140,7 @@ static void tiny_break_ctl(struct uart_port *port, int break_state)
 }
 
 static void tiny_set_termios(struct uart_port *port,
-			     struct termios *new, struct termios *old)
+			     struct ktermios *new, struct ktermios *old)
 {
 	int baud, quot, cflag = new->c_cflag;
 	/* get the byte size */
@@ -198,6 +198,7 @@ static int tiny_startup(struct uart_port *port)
 		timer = kmalloc(sizeof(*timer), GFP_KERNEL);
 		if (!timer)
 			return -ENOMEM;
+		init_timer(timer);
 	}
 	timer->data = (unsigned long)port;
 	timer->expires = jiffies + DELAY_TIME;
