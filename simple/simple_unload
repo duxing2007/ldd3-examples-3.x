@@ -6,7 +6,7 @@ device="simple"
 /sbin/rmmod $module $* || exit 1
 
 # Remove stale nodes
-rm -f /dev/${device}[rn] 
+rm -f /dev/${device}r
 
 
 
