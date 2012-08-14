@@ -22,12 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-/* #include <unistd.h> */ /* conflicting on the alpha */
-#define __LIBRARY__ /* _syscall3 and friends are only available through this */
-#include <linux/unistd.h>
-
-/* define the system call, to override the library function */
-_syscall3(int, syslog, int, type, char *, bufp, int, len);
+#include <sys/klog.h>
 
 int main(int argc, char **argv)
 {
@@ -38,7 +33,7 @@ int main(int argc, char **argv)
     } else {
         fprintf(stderr, "%s: need a single arg\n",argv[0]); exit(1);
     }
-    if (syslog(8,NULL,level) < 0) {  
+    if (klogctl(8,NULL,level) < 0) {
         fprintf(stderr,"%s: syslog(setlevel): %s\n",
                 argv[0],strerror(errno));
         exit(1);
