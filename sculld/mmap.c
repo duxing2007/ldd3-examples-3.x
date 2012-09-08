@@ -19,6 +19,7 @@
 
 #include <linux/mm.h>		/* everything */
 #include <linux/errno.h>	/* error codes */
+#include <linux/fs.h>
 #include <asm/pgtable.h>
 
 #include "sculld.h"		/* local definitions */
@@ -56,16 +57,16 @@ void sculld_vma_close(struct vm_area_struct *vma)
  * is individually decreased, and would drop to 0.
  */
 
-struct page *sculld_vma_nopage(struct vm_area_struct *vma,
-                                unsigned long address, int *type)
+int sculld_vma_fault(struct vm_area_struct *vma,
+                                struct vm_fault *vmf)
 {
 	unsigned long offset;
 	struct sculld_dev *ptr, *dev = vma->vm_private_data;
-	struct page *page = NOPAGE_SIGBUS;
+	struct page *page = NULL;
 	void *pageptr = NULL; /* default to "missing" */
 
-	down(&dev->sem);
-	offset = (address - vma->vm_start) + (vma->vm_pgoff << PAGE_SHIFT);
+	mutex_lock(&dev->mutex);
+	offset = (unsigned long)(vmf->virtual_address - vma->vm_start) + (vma->vm_pgoff << PAGE_SHIFT);
 	if (offset >= dev->size) goto out; /* out of range */
 
 	/*
@@ -83,11 +84,12 @@ struct page *sculld_vma_nopage(struct vm_area_struct *vma,
 
 	/* got it, now increment the count */
 	get_page(page);
-	if (type)
-		*type = VM_FAULT_MINOR;
   out:
-	up(&dev->sem);
-	return page;
+	mutex_unlock(&dev->mutex);
+	if (!page)
+		return VM_FAULT_SIGBUS;
+	vmf->page = page;
+	return 0;
 }
 
 
@@ -95,7 +97,7 @@ struct page *sculld_vma_nopage(struct vm_area_struct *vma,
 struct vm_operations_struct sculld_vm_ops = {
 	.open =     sculld_vma_open,
 	.close =    sculld_vma_close,
-	.nopage =   sculld_vma_nopage,
+	.fault =   sculld_vma_fault,
 };
 
 

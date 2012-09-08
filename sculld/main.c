@@ -92,7 +92,7 @@ int sculld_read_procmem(char *buf, char **start, off_t offset,
 	*start = buf;
 	for(i = 0; i < sculld_devs; i++) {
 		d = &sculld_devices[i];
-		if (down_interruptible (&d->sem))
+		if (mutex_lock_interruptible(&d->mutex))
 			return -ERESTARTSYS;
 		qset = d->qset;  /* retrieve the features of each device */
 		order = d->order;
@@ -113,7 +113,7 @@ int sculld_read_procmem(char *buf, char **start, off_t offset,
 				}
 		}
 	  out:
-		up (&sculld_devices[i].sem);
+		mutex_unlock(&sculld_devices[i].mutex);
 		if (len > limit)
 			break;
 	}
@@ -136,10 +136,10 @@ int sculld_open (struct inode *inode, struct file *filp)
 
     	/* now trim to 0 the length of the device if open was write-only */
 	if ( (filp->f_flags & O_ACCMODE) == O_WRONLY) {
-		if (down_interruptible (&dev->sem))
+		if (mutex_lock_interruptible(&dev->mutex))
 			return -ERESTARTSYS;
 		sculld_trim(dev); /* ignore errors */
-		up (&dev->sem);
+		mutex_unlock(&dev->mutex);
 	}
 
 	/* and use filp->private_data to point to the device data */
@@ -173,8 +173,8 @@ struct sculld_dev *sculld_follow(struct sculld_dev *dev, int n)
  * Data management: read and write
  */
 
-ssize_t sculld_read (struct file *filp, char __user *buf, size_t count,
-                loff_t *f_pos)
+ssize_t sculld_do_read (struct file *filp, char __user *buf, size_t count,
+                loff_t *f_pos, int aio)
 {
 	struct sculld_dev *dev = filp->private_data; /* the first listitem */
 	struct sculld_dev *dptr;
@@ -184,7 +184,7 @@ ssize_t sculld_read (struct file *filp, char __user *buf, size_t count,
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = 0;
 
-	if (down_interruptible (&dev->sem))
+	if (mutex_lock_interruptible(&dev->mutex))
 		return -ERESTARTSYS;
 	if (*f_pos > dev->size) 
 		goto nothing;
@@ -205,24 +205,36 @@ ssize_t sculld_read (struct file *filp, char __user *buf, size_t count,
 	if (count > quantum - q_pos)
 		count = quantum - q_pos; /* read only up to the end of this quantum */
 
-	if (copy_to_user (buf, dptr->data[s_pos]+q_pos, count)) {
-		retval = -EFAULT;
-		goto nothing;
+	if (aio) {
+		if (memcpy (buf, dptr->data[s_pos]+q_pos, count)) {
+			retval = -EFAULT;
+			goto nothing;
+		}
+	} else {
+		if (copy_to_user (buf, dptr->data[s_pos]+q_pos, count)) {
+			retval = -EFAULT;
+			goto nothing;
+		}
 	}
-	up (&dev->sem);
+	mutex_unlock(&dev->mutex);
 
 	*f_pos += count;
 	return count;
 
   nothing:
-	up (&dev->sem);
+	mutex_unlock(&dev->mutex);
 	return retval;
 }
 
-
-
-ssize_t sculld_write (struct file *filp, const char __user *buf, size_t count,
+ssize_t sculld_read (struct file *filp, char __user *buf, size_t count,
                 loff_t *f_pos)
+{
+	return sculld_do_read(filp, buf, count, f_pos, 0);
+}
+
+
+ssize_t sculld_do_write (struct file *filp, const char __user *buf, size_t count,
+                loff_t *f_pos, int aio)
 {
 	struct sculld_dev *dev = filp->private_data;
 	struct sculld_dev *dptr;
@@ -232,7 +244,7 @@ ssize_t sculld_write (struct file *filp, const char __user *buf, size_t count,
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = -ENOMEM; /* our most likely error */
 
-	if (down_interruptible (&dev->sem))
+	if (mutex_lock_interruptible(&dev->mutex))
 		return -ERESTARTSYS;
 
 	/* find listitem, qset index and offset in the quantum */
@@ -258,28 +270,42 @@ ssize_t sculld_write (struct file *filp, const char __user *buf, size_t count,
 	}
 	if (count > quantum - q_pos)
 		count = quantum - q_pos; /* write only up to the end of this quantum */
-	if (copy_from_user (dptr->data[s_pos]+q_pos, buf, count)) {
-		retval = -EFAULT;
-		goto nomem;
+	if (aio) {
+		if (memcpy (dptr->data[s_pos]+q_pos, buf, count)) {
+			retval = -EFAULT;
+			goto nomem;
+		}
+	} else {
+		if (copy_from_user (dptr->data[s_pos]+q_pos, buf, count)) {
+			retval = -EFAULT;
+			goto nomem;
+		}
 	}
 	*f_pos += count;
  
     	/* update the size */
 	if (dev->size < *f_pos)
 		dev->size = *f_pos;
-	up (&dev->sem);
+	mutex_unlock(&dev->mutex);
 	return count;
 
   nomem:
-	up (&dev->sem);
+	mutex_unlock(&dev->mutex);
 	return retval;
+}
+
+
+ssize_t sculld_write (struct file *filp, const char __user *buf, size_t count,
+                loff_t *f_pos)
+{
+	return sculld_do_write(filp, buf, count, f_pos, 0);
 }
 
 /*
  * The ioctl() implementation
  */
 
-int sculld_ioctl (struct inode *inode, struct file *filp,
+long sculld_ioctl (struct file *filp,
                  unsigned int cmd, unsigned long arg)
 {
 
@@ -408,31 +434,72 @@ loff_t sculld_llseek (struct file *filp, loff_t off, int whence)
 struct async_work {
 	struct kiocb *iocb;
 	int result;
-	struct work_struct work;
+	struct delayed_work work;
 };
 
 /*
  * "Complete" an asynchronous operation.
  */
-static void sculld_do_deferred_op(void *p)
+static void sculld_do_deferred_op(struct work_struct *p)
 {
-	struct async_work *stuff = (struct async_work *) p;
+	struct async_work *stuff = container_of(p, struct async_work, work.work);
 	aio_complete(stuff->iocb, stuff->result, 0);
 	kfree(stuff);
 }
 
 
-static int sculld_defer_op(int write, struct kiocb *iocb, char __user *buf,
-		size_t count, loff_t pos)
+static int sculld_defer_op(int write, struct kiocb *iocb, const struct iovec *iov,
+		unsigned long nr_segs, loff_t pos)
 {
 	struct async_work *stuff;
 	int result;
+	char			*buf;
+	char			*to_copy;
+	int i;
+	size_t total;
+	size_t cur_len;
+
+	total = iov_length(iov, nr_segs);
+	buf = kmalloc(total, GFP_KERNEL);
+	if (unlikely(!buf))
+		return -ENOMEM;
 
 	/* Copy now while we can access the buffer */
 	if (write)
-		result = sculld_write(iocb->ki_filp, buf, count, &pos);
+	{
+		to_copy = buf;
+		for (i = 0; i < nr_segs; i++) {
+			if (unlikely(copy_from_user(to_copy, iov[i].iov_base,
+							iov[i].iov_len) != 0)) {
+				kfree(buf);
+				return -EFAULT;
+			}
+			to_copy += iov[i].iov_len;
+		}
+
+		result = sculld_do_write(iocb->ki_filp, buf, total, &pos, 1);
+	}
 	else
-		result = sculld_read(iocb->ki_filp, buf, count, &pos);
+	{
+		result = sculld_do_read(iocb->ki_filp, buf, total, &pos, 1);
+
+		total = result;
+		to_copy = buf;
+		for (i = 0; i < nr_segs; i++) {
+			if (total <= 0)
+				break;
+
+			cur_len = min((size_t)(iov[i].iov_len), total);
+			if (copy_to_user(iov[i].iov_base, to_copy, cur_len)) {
+				kfree(buf);
+				return -EFAULT;
+			}
+			total -= cur_len;
+			to_copy += cur_len;
+		}
+	}
+
+	kfree(buf);
 
 	/* If this is a synchronous IOCB, we return our status now. */
 	if (is_sync_kiocb(iocb))
@@ -444,22 +511,22 @@ static int sculld_defer_op(int write, struct kiocb *iocb, char __user *buf,
 		return result; /* No memory, just complete now */
 	stuff->iocb = iocb;
 	stuff->result = result;
-	INIT_WORK(&stuff->work, sculld_do_deferred_op, stuff);
+	INIT_DELAYED_WORK(&stuff->work, sculld_do_deferred_op);
 	schedule_delayed_work(&stuff->work, HZ/100);
 	return -EIOCBQUEUED;
 }
 
 
-static ssize_t sculld_aio_read(struct kiocb *iocb, char __user *buf, size_t count,
-		loff_t pos)
+static ssize_t sculld_aio_read(struct kiocb *iocb, const struct iovec *iov,
+		unsigned long nr_segs, loff_t pos)
 {
-	return sculld_defer_op(0, iocb, buf, count, pos);
+	return sculld_defer_op(0, iocb, iov, nr_segs, pos);
 }
 
-static ssize_t sculld_aio_write(struct kiocb *iocb, const char __user *buf,
-		size_t count, loff_t pos)
+static ssize_t sculld_aio_write(struct kiocb *iocb, const struct iovec *iov,
+		unsigned long nr_segs, loff_t pos)
 {
-	return sculld_defer_op(1, iocb, (char __user *) buf, count, pos);
+	return sculld_defer_op(1, iocb, iov, nr_segs, pos);
 }
 
 
@@ -479,7 +546,7 @@ struct file_operations sculld_fops = {
 	.llseek =    sculld_llseek,
 	.read =	     sculld_read,
 	.write =     sculld_write,
-	.ioctl =     sculld_ioctl,
+	.unlocked_ioctl =     sculld_ioctl,
 	.mmap =	     sculld_mmap,
 	.open =	     sculld_open,
 	.release =   sculld_release,
@@ -531,9 +598,10 @@ static void sculld_setup_cdev(struct sculld_dev *dev, int index)
 		printk(KERN_NOTICE "Error %d adding scull%d", err, index);
 }
 
-static ssize_t sculld_show_dev(struct device *ddev, char *buf)
+static ssize_t sculld_show_dev(struct device *ddev, struct device_attribute *attr,
+				char *buf)
 {
-	struct sculld_dev *dev = ddev->driver_data;
+	struct sculld_dev *dev = dev_get_drvdata(ddev);
 
 	return print_dev_t(buf, dev->cdev.dev);
 }
@@ -545,7 +613,7 @@ static void sculld_register_dev(struct sculld_dev *dev, int index)
 	sprintf(dev->devname, "sculld%d", index);
 	dev->ldev.name = dev->devname;
 	dev->ldev.driver = &sculld_driver;
-	dev->ldev.dev.driver_data = dev;
+	dev_set_drvdata(&dev->ldev.dev, dev);
 	register_ldd_device(&dev->ldev);
 	device_create_file(&dev->ldev.dev, &dev_attr_dev);
 }
@@ -590,7 +658,7 @@ int sculld_init(void)
 	for (i = 0; i < sculld_devs; i++) {
 		sculld_devices[i].order = sculld_order;
 		sculld_devices[i].qset = sculld_qset;
-		sema_init (&sculld_devices[i].sem, 1);
+		mutex_init (&sculld_devices[i].mutex);
 		sculld_setup_cdev(sculld_devices + i, i);
 		sculld_register_dev(sculld_devices + i, i);
 	}
