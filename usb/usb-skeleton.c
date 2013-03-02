@@ -27,9 +27,13 @@
 #define USB_SKEL_VENDOR_ID	0xfff0
 #define USB_SKEL_PRODUCT_ID	0xfff0
 
+#define USB_SKEL_G_ZERO_VID 0x0525
+#define USB_SKEL_G_ZERO_PID 0xa4a0
+
 /* table of devices that work with this driver */
 static const struct usb_device_id skel_table[] = {
 	{ USB_DEVICE(USB_SKEL_VENDOR_ID, USB_SKEL_PRODUCT_ID) },
+	{ USB_DEVICE(USB_SKEL_G_ZERO_VID, USB_SKEL_G_ZERO_PID) },
 	{ }					/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, skel_table);
@@ -62,7 +66,6 @@ struct usb_skel {
 	int			errors;			/* the last request tanked */
 	int			open_count;		/* count the number of openers */
 	bool			ongoing_read;		/* a read is going on */
-	bool			processed_urb;		/* indicates we haven't processed the urb */
 	spinlock_t		err_lock;		/* lock for errors */
 	struct kref		kref;
 	struct mutex		io_mutex;		/* synchronize I/O with disconnect */
@@ -286,17 +289,6 @@ retry:
 		 * we must finish now
 		 */
 		dev->bulk_in_copied = 0;
-		dev->processed_urb = 1;
-	}
-
-	if (!dev->processed_urb) {
-		/*
-		 * the URB hasn't been processed
-		 * do it now
-		 */
-		wait_for_completion(&dev->bulk_in_completion);
-		dev->bulk_in_copied = 0;
-		dev->processed_urb = 1;
 	}
 
 	/* errors must be reported */
@@ -595,7 +587,7 @@ static int skel_probe(struct usb_interface *interface,
 
 	/* let the user know what node this device is now attached to */
 	dev_info(&interface->dev,
-		 "USB Skeleton device now attached to USBSkel-%d",
+		 "USB Skeleton device now attached to USBSkel-%d\n",
 		 interface->minor);
 	return 0;
 
