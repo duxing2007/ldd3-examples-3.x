@@ -81,6 +81,7 @@ int sculld_vma_fault(struct vm_area_struct *vma,
 	}
 	if (ptr && ptr->data) pageptr = ptr->data[offset];
 	if (!pageptr) goto out; /* hole or end-of-file */
+	page = virt_to_page(pageptr);
 
 	/* got it, now increment the count */
 	get_page(page);

@@ -82,6 +82,7 @@ int scullc_vma_fault(struct vm_area_struct *vma,
 	if (!pageptr) goto out; /* hole or end-of-file */
 
 	/* got it, now increment the count */
+	page = virt_to_page(pageptr);
 	get_page(page);
   out:
 	mutex_unlock(&dev->mutex);
