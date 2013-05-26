@@ -95,7 +95,50 @@ static int simple_remap_mmap(struct file *filp, struct vm_area_struct *vma)
 
 
 
+/*
+ * The nopage version.
+ */
+struct page *simple_vma_nopage(struct vm_area_struct *vma,
+                unsigned long address, int *type)
+{
+	struct page *pageptr;
+	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
+	unsigned long physaddr = address - vma->vm_start + offset;
+	unsigned long pageframe = physaddr >> PAGE_SHIFT;
 
+// Eventually remove these printks
+	printk (KERN_NOTICE "---- Nopage, off %lx phys %lx\n", offset, physaddr);
+	printk (KERN_NOTICE "VA is %p\n", __va (physaddr));
+	printk (KERN_NOTICE "Page at %p\n", virt_to_page (__va (physaddr)));
+	if (!pfn_valid(pageframe))
+		return NOPAGE_SIGBUS;
+	pageptr = pfn_to_page(pageframe);
+	printk (KERN_NOTICE "page->index = %ld mapping %p\n", pageptr->index, pageptr->mapping);
+	printk (KERN_NOTICE "Page frame %ld\n", pageframe);
+	get_page(pageptr);
+	if (type)
+		*type = VM_FAULT_MINOR;
+	return pageptr;
+}
+
+static struct vm_operations_struct simple_nopage_vm_ops = {
+	.open =   simple_vma_open,
+	.close =  simple_vma_close,
+	.nopage = simple_vma_nopage,
+};
+
+static int simple_nopage_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
+
+	if (offset >= __pa(high_memory) || (filp->f_flags & O_SYNC))
+		vma->vm_flags |= VM_IO;
+	vma->vm_flags |= VM_RESERVED;
+
+	vma->vm_ops = &simple_nopage_vm_ops;
+	simple_vma_open(vma);
+	return 0;
+}
 
 
 /*
@@ -127,12 +170,20 @@ static struct file_operations simple_remap_ops = {
 	.mmap    = simple_remap_mmap,
 };
 
+/* Device 1 uses nopage */
+static struct file_operations simple_nopage_ops = {
+	.owner   = THIS_MODULE,
+	.open    = simple_open,
+	.release = simple_release,
+	.mmap    = simple_nopage_mmap,
+};
 
-#define MAX_SIMPLE_DEV 1
+#define MAX_SIMPLE_DEV 2
 
 #if 0
 static struct file_operations *simple_fops[MAX_SIMPLE_DEV] = {
 	&simple_remap_ops,
+	&simple_nopage_ops,
 };
 #endif
 
@@ -152,9 +203,9 @@ static int simple_init(void)
 
 	/* Figure out our device number. */
 	if (simple_major)
-		result = register_chrdev_region(dev, MAX_SIMPLE_DEV, "simple");
+		result = register_chrdev_region(dev, 2, "simple");
 	else {
-		result = alloc_chrdev_region(&dev, 0, MAX_SIMPLE_DEV, "simple");
+		result = alloc_chrdev_region(&dev, 0, 2, "simple");
 		simple_major = MAJOR(dev);
 	}
 	if (result < 0) {
@@ -166,6 +217,7 @@ static int simple_init(void)
 
 	/* Now set up two cdevs. */
 	simple_setup_cdev(SimpleDevs, 0, &simple_remap_ops);
+	simple_setup_cdev(SimpleDevs + 1, 1, &simple_nopage_ops);
 	return 0;
 }
 
@@ -173,7 +225,8 @@ static int simple_init(void)
 static void simple_cleanup(void)
 {
 	cdev_del(SimpleDevs);
-	unregister_chrdev_region(MKDEV(simple_major, 0), MAX_SIMPLE_DEV);
+	cdev_del(SimpleDevs + 1);
+	unregister_chrdev_region(MKDEV(simple_major, 0), 2);
 }
 
 
