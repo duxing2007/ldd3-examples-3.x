@@ -679,7 +679,7 @@ void snull_init(struct net_device *dev)
 
 	/* keep the default flags, just add NOARP */
 	dev->flags           |= IFF_NOARP;
-	dev->features        |= NETIF_F_NO_CSUM;
+	dev->features        |= NETIF_F_HW_CSUM;
 	dev->netdev_ops = &snull_netdev_ops;
 	dev->header_ops = &snull_header_ops;
 
