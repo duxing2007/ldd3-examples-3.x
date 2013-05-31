@@ -27,7 +27,6 @@
 #include <linux/kernel.h> /* printk */
 #include <linux/ioport.h>
 #include <linux/errno.h>
-#include <asm/system.h> /* cli(), *_flags */
 #include <linux/mm.h> /* vremap (2.0) */
 #include <asm/io.h> /* ioremap */
 
