@@ -39,7 +39,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 /*
  * Open the device; in fact, there's nothing to do here.
  */
-static int simple_open (struct inode *inode, struct file *filp)
+static int ldd_simple_open (struct inode *inode, struct file *filp)
 {
 	return 0;
 }
@@ -164,7 +164,7 @@ static void simple_setup_cdev(struct cdev *dev, int minor,
 /* Device 0 uses remap_pfn_range */
 static struct file_operations simple_remap_ops = {
 	.owner   = THIS_MODULE,
-	.open    = simple_open,
+	.open    = ldd_simple_open,
 	.release = simple_release,
 	.mmap    = simple_remap_mmap,
 };
@@ -172,7 +172,7 @@ static struct file_operations simple_remap_ops = {
 /* Device 1 uses fault */
 static struct file_operations simple_fault_ops = {
 	.owner   = THIS_MODULE,
-	.open    = simple_open,
+	.open    = ldd_simple_open,
 	.release = simple_release,
 	.mmap    = simple_fault_mmap,
 };
