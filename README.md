@@ -28,7 +28,7 @@ but they also **RUN** on the modern kernel!
 how to port
 =================
 
-Compile code.
+Make it compile.
 -----------------
 a. clone linux-stable repo from
     http://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
