@@ -44,7 +44,7 @@ b. Use git log to find out who changed what when. Then determine what is causing
 
 c. Use git bisect when git log fails to work.
 
-Run it.
+Make it run.
 -----------------
 First you should understand the original examples,
 
