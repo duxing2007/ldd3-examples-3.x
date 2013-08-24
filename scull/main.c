@@ -210,9 +210,10 @@ static void scull_create_proc(void)
 	create_proc_read_entry("scullmem", 0 /* default mode */,
 			NULL /* parent dir */, scull_read_procmem,
 			NULL /* client data */);
-	entry = create_proc_entry("scullseq", 0, NULL);
-	if (entry)
-		entry->proc_fops = &scull_proc_ops;
+	entry = proc_create("scullseq", 0, NULL, &scull_proc_ops);
+	if (!entry) {
+		printk(KERN_WARNING "proc_create scullseq failed\n");
+    }
 }
 
 static void scull_remove_proc(void)
