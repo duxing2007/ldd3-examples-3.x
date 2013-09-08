@@ -95,7 +95,7 @@ static void tiny_start_tx(struct uart_port *port)
 static void tiny_timer(unsigned long data)
 {
 	struct uart_port *port;
-	struct tty_struct *tty;
+	struct tty_port *tport;
 
 
 	port = (struct uart_port *)data;
@@ -103,15 +103,13 @@ static void tiny_timer(unsigned long data)
 		return;
 	if (!port->state)
 		return;
-	tty = port->state->port.tty;
-	if (!tty)
-		return;
+	tport = &port->state->port;
 
 	/* add one character to the tty port */
 	/* this doesn't actually push the data through unless tty->low_latency is set */
-	tty_insert_flip_char(tty, TINY_DATA_CHARACTER, 0);
+	tty_insert_flip_char(tport, TINY_DATA_CHARACTER, 0);
 
-	tty_flip_buffer_push(tty);
+	tty_flip_buffer_push(tport);
 
 	/* resubmit the timer again */
 	timer->expires = jiffies + DELAY_TIME;
