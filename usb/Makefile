@@ -19,5 +19,5 @@ all:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD)
 
 clean:
-	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions
+	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions Module.symvers modules.order
 
