@@ -26,7 +26,6 @@
 #include <linux/proc_fs.h>
 #include <linux/fcntl.h>	/* O_ACCMODE */
 #include <linux/aio.h>
-#include <linux/seq_file.h>
 #include <asm/uaccess.h>
 #include "scullc.h"		/* local definitions */
 
@@ -60,54 +59,61 @@ struct kmem_cache *scullc_cache;
  * The proc filesystem: function to read and entry
  */
 
-static int scullc_read_mem_proc_show(struct seq_file *m, void *v)
+void scullc_proc_offset(char *buf, char **start, off_t *offset, int *len)
 {
-	int i, j, quantum, qset;
-	int limit = m->size - 80; /* Don't print more than this */
+	if (*offset == 0)
+		return;
+	if (*offset >= *len) {
+		/* Not there yet */
+		*offset -= *len;
+		*len = 0;
+	} else {
+		/* We're into the interesting stuff now */
+		*start = buf + *offset;
+		*offset = 0;
+	}
+}
+
+/* FIXME: Do we need this here??  It be ugly  */
+int scullc_read_procmem(char *buf, char **start, off_t offset,
+                   int count, int *eof, void *data)
+{
+	int i, j, quantum, qset, len = 0;
+	int limit = count - 80; /* Don't print more than this */
 	struct scullc_dev *d;
 
+	*start = buf;
 	for(i = 0; i < scullc_devs; i++) {
 		d = &scullc_devices[i];
 		if (mutex_lock_interruptible(&d->mutex))
 			return -ERESTARTSYS;
 		qset = d->qset;  /* retrieve the features of each device */
 		quantum=d->quantum;
-		seq_printf(m,"\nDevice %i: qset %i, quantum %i, sz %li\n",
+		len += sprintf(buf+len,"\nDevice %i: qset %i, quantum %i, sz %li\n",
 				i, qset, quantum, (long)(d->size));
 		for (; d; d = d->next) { /* scan the list */
-			seq_printf(m,"  item at %p, qset at %p\n",d,d->data);
-			if (m->count > limit)
+			len += sprintf(buf+len,"  item at %p, qset at %p\n",d,d->data);
+			scullc_proc_offset (buf, start, &offset, &len);
+			if (len > limit)
 				goto out;
 			if (d->data && !d->next) /* dump only the last item - save space */
 				for (j = 0; j < qset; j++) {
 					if (d->data[j])
-						seq_printf(m,"    % 4i:%8p\n",j,d->data[j]);
-					if (m->count > limit)
+						len += sprintf(buf+len,"    % 4i:%8p\n",j,d->data[j]);
+					scullc_proc_offset (buf, start, &offset, &len);
+					if (len > limit)
 						goto out;
 				}
 		}
 	  out:
 		mutex_unlock(&scullc_devices[i].mutex);
-		if (m->count > limit)
+		if (len > limit)
 			break;
 	}
-	return 0;
+	*eof = 1;
+	return len;
 }
 
-#define DEFINE_PROC_SEQ_FILE(_name) \
-	static int _name##_proc_open(struct inode *inode, struct file *file)\
-	{\
-		return single_open(file, _name##_proc_show, NULL);\
-	}\
-	\
-	static const struct file_operations _name##_proc_fops = {\
-		.open		= _name##_proc_open,\
-		.read		= seq_read,\
-		.llseek		= seq_lseek,\
-		.release	= single_release,\
-	};
-
-DEFINE_PROC_SEQ_FILE(scullc_read_mem)
 #endif /* SCULLC_USE_PROC */
 
 /*
@@ -625,7 +631,7 @@ int scullc_init(void)
 	}
 
 #ifdef SCULLC_USE_PROC /* only when available */
-	proc_create("scullcmem", 0, NULL, &scullc_read_mem_proc_fops);
+	create_proc_read_entry("scullcmem", 0, NULL, scullc_read_procmem, NULL);
 #endif
 	return 0; /* succeed */
 

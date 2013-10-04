@@ -85,32 +85,34 @@ int scull_trim(struct scull_dev *dev)
  * The proc filesystem: function to read and entry
  */
 
-static int scull_read_mem_proc_show(struct seq_file *m, void *v)
+int scull_read_procmem(char *buf, char **start, off_t offset,
+                   int count, int *eof, void *data)
 {
-	int i, j;
-	int limit = m->size - 80; /* Don't print more than this */
+	int i, j, len = 0;
+	int limit = count - 80; /* Don't print more than this */
 
-	for (i = 0; i < scull_nr_devs && m->count <= limit; i++) {
+	for (i = 0; i < scull_nr_devs && len <= limit; i++) {
 		struct scull_dev *d = &scull_devices[i];
 		struct scull_qset *qs = d->data;
 		if (mutex_lock_interruptible(&d->mutex))
 			return -ERESTARTSYS;
-		seq_printf(m,"\nDevice %i: qset %i, q %i, sz %li\n",
+		len += sprintf(buf+len,"\nDevice %i: qset %i, q %i, sz %li\n",
 				i, d->qset, d->quantum, d->size);
-		for (; qs && m->count <= limit; qs = qs->next) { /* scan the list */
-			seq_printf(m, "  item at %p, qset at %p\n",
+		for (; qs && len <= limit; qs = qs->next) { /* scan the list */
+			len += sprintf(buf + len, "  item at %p, qset at %p\n",
 					qs, qs->data);
 			if (qs->data && !qs->next) /* dump only the last item */
 				for (j = 0; j < d->qset; j++) {
 					if (qs->data[j])
-						seq_printf(m,
+						len += sprintf(buf + len,
 								"    % 4i: %8p\n",
 								j, qs->data[j]);
 				}
 		}
 		mutex_unlock(&scull_devices[i].mutex);
 	}
-	return 0;
+	*eof = 1;
+	return len;
 }
 
 
@@ -198,21 +200,6 @@ static struct file_operations scull_proc_ops = {
 };
 	
 
-#define DEFINE_PROC_SEQ_FILE(_name) \
-	static int _name##_proc_open(struct inode *inode, struct file *file)\
-	{\
-		return single_open(file, _name##_proc_show, NULL);\
-	}\
-	\
-	static const struct file_operations _name##_proc_fops = {\
-		.open		= _name##_proc_open,\
-		.read		= seq_read,\
-		.llseek		= seq_lseek,\
-		.release	= single_release,\
-	};
-
-DEFINE_PROC_SEQ_FILE(scull_read_mem)
-
 /*
  * Actually create (and remove) the /proc file(s).
  */
@@ -220,12 +207,12 @@ DEFINE_PROC_SEQ_FILE(scull_read_mem)
 static void scull_create_proc(void)
 {
 	struct proc_dir_entry *entry;
-	proc_create("scullmem", 0 /* default mode */,
-			NULL /* parent dir */, &scull_read_mem_proc_fops);
-	entry = proc_create("scullseq", 0, NULL, &scull_proc_ops);
-	if (!entry) {
-		printk(KERN_WARNING "proc_create scullseq failed\n");
-    }
+	create_proc_read_entry("scullmem", 0 /* default mode */,
+			NULL /* parent dir */, scull_read_procmem,
+			NULL /* client data */);
+	entry = create_proc_entry("scullseq", 0, NULL);
+	if (entry)
+		entry->proc_fops = &scull_proc_ops;
 }
 
 static void scull_remove_proc(void)
@@ -234,6 +221,7 @@ static void scull_remove_proc(void)
 	remove_proc_entry("scullmem", NULL /* parent dir */);
 	remove_proc_entry("scullseq", NULL);
 }
+
 
 #endif /* SCULL_DEBUG */
 

@@ -20,7 +20,6 @@ to the longterm stable branch after linux 3.0, including:
 |linux 3.0       |July 2011 |
 |linux 3.2       |January 2012 |
 |linux 3.4       |May 2012 |
-|linux 3.10       |June 2013 |
 
 The key difference between this project and other porting attemps is that
 all these examples not only compile on the modern kernel version,
@@ -55,7 +54,7 @@ If you still can't fix the bug, debug it using below methods:
 
 a. compare similar driver code in linux-stable.
    For example: debuging snull by refering to loopback.c,
-       debug sbull by refering to loop.c...
+       debug snull by refering to loop.c...
 
 b. printk
 

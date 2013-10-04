@@ -132,7 +132,7 @@ static int simple_fault_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	if (offset >= __pa(high_memory) || (filp->f_flags & O_SYNC))
 		vma->vm_flags |= VM_IO;
-	vma->vm_flags |= (VM_DONTEXPAND | VM_DONTDUMP);
+	vma->vm_flags |= VM_RESERVED;
 
 	vma->vm_ops = &simple_fault_vm_ops;
 	simple_vma_open(vma);
