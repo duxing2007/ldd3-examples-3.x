@@ -3,7 +3,7 @@ ldd3-examples-3.x
 
 port of the ldd3 source code examples to linux 3.x
 
-backgroud
+Backgroud
 =================
 ldd3 is Linux Device Drivers, Third Edition.
 This is a great book about how to write linux device drivers.
@@ -20,14 +20,26 @@ to the longterm stable branch after linux 3.0, including:
 |linux 3.0       |July 2011 |
 |linux 3.2       |January 2012 |
 |linux 3.4       |May 2012 |
-|linux 3.10       |June 2013 |
+|linux 3.10      |June 2013 |
 
 The key difference between this project and other porting attemps is that
 all these examples not only compile on the modern kernel version,
 but they also **RUN** on the modern kernel!
 
-how to port
+
+Quick start
 =================
+a. clone this repo
+
+b. checkout to branch which is nearest to your linux kernel version
+
+c. just type ```make``` to build ldd3 examples
+
+
+How to port
+=================
+(This section is for developers who want to port ldd3 examples by themselves,
+reading previous quick start section is enough for the beginners.)
 
 Make it compile.
 -----------------
