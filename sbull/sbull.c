@@ -147,33 +147,15 @@ static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
 
 	/* Do each segment independently. */
 	bio_for_each_segment(bvec, bio, i) {
-		char *buffer = __bio_kmap_atomic(bio, i, KM_USER0);
+		char *buffer = __bio_kmap_atomic(bio, i);
 		sbull_transfer(dev, sector,bytes_to_sectors_checked(bio_cur_bytes(bio)),
 				buffer, bio_data_dir(bio) == WRITE);
 		sector += (bytes_to_sectors_checked(bio_cur_bytes(bio)));
-		__bio_kunmap_atomic(bio, KM_USER0);
+		__bio_kunmap_atomic(bio);
 	}
 	return 0; /* Always "succeed" */
 }
 
-#ifdef XFER_BVEC
-/*
- * Transfer a single bio_vec.
- */
-static int sbull_xfer_bvec(struct sbull_dev *dev, struct bio_vec *bvec, unsigned long data_dir, sector_t cur_sector)
-{
-	char *buffer = kmap_atomic(bvec->bv_page, KM_USER0);
-	sbull_transfer(dev, cur_sector, bytes_to_sectors_checked(bvec->bv_len),
-			buffer+bvec->bv_offset, data_dir == WRITE);
-	kunmap_atomic(buffer, KM_USER0);
-	return 0; /* Always "succeed" */
-}
-#else
-static int sbull_xfer_bvec(struct sbull_dev *dev, struct bio_vec *bvec, unsigned long data_dir, sector_t cur_sector)
-{
-	return -1;
-}
-#endif
 
 /*
  * Transfer a full request.
@@ -249,7 +231,7 @@ static int sbull_open(struct block_device *bdev, fmode_t mode)
 	return 0;
 }
 
-static int sbull_release(struct gendisk *disk, fmode_t mode)
+static void sbull_release(struct gendisk *disk, fmode_t mode)
 {
 	struct sbull_dev *dev = disk->private_data;
 
@@ -262,7 +244,6 @@ static int sbull_release(struct gendisk *disk, fmode_t mode)
 	}
 	spin_unlock(&dev->lock);
 
-	return 0;
 }
 
 /*
