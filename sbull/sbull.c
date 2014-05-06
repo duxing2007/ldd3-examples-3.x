@@ -183,8 +183,7 @@ static void sbull_full_request(struct request_queue *q)
 	struct sbull_dev *dev = q->queuedata;
 	int ret;
 
-	req = blk_fetch_request(q);
-	while (req) {
+	while ((req = blk_fetch_request(q)) != NULL) {
 		if (req->cmd_type != REQ_TYPE_FS) {
 			printk (KERN_NOTICE "Skip non-fs request\n");
 			ret = -EIO;
@@ -193,9 +192,7 @@ static void sbull_full_request(struct request_queue *q)
 		sbull_xfer_request(dev, req);
 		ret = 0;
 	done:
-		if(!__blk_end_request_cur(req, ret)){
-			req = blk_fetch_request(q);
-		}
+		__blk_end_request_all(req, ret);
 	}
 }
 
