@@ -63,6 +63,7 @@ static struct clientdata {
 	struct seq_file *m;
 	unsigned long jiffies;
 	long delay;
+	int wait_cond;
 	struct delayed_work jiq_work;
 	struct work_struct work;
 } jiq_data;
@@ -85,6 +86,7 @@ static int jiq_print(void *ptr)
 	unsigned long j = jiffies;
 
 	if (m->count > LIMIT) {
+		data->wait_cond = 1;
 		wake_up_interruptible(&jiq_wait);
 		return 0;
 	}
@@ -187,6 +189,7 @@ static struct timer_list jiq_timer;
 static void jiq_timedout(unsigned long ptr)
 {
 	jiq_print((void *)ptr);            /* print a line */
+
 	wake_up_interruptible(&jiq_wait);  /* awake the process */
 }
 
@@ -195,6 +198,7 @@ static int jiq_read_run_timer_proc_show(struct seq_file *m, void *v)
 
 	jiq_data.m = m;
 	jiq_data.jiffies = jiffies;
+	jiq_data.wait_cond = 0;
 
 	init_timer(&jiq_timer);              /* init the timer structure */
 	jiq_timer.function = jiq_timedout;
@@ -203,7 +207,7 @@ static int jiq_read_run_timer_proc_show(struct seq_file *m, void *v)
 
 	jiq_print(&jiq_data);   /* print and go to sleep */
 	add_timer(&jiq_timer);
-	interruptible_sleep_on(&jiq_wait);  /* RACE */
+	wait_event_interruptible(jiq_wait, jiq_data.wait_cond);  /* RACE */
 	del_timer_sync(&jiq_timer);  /* in case a signal woke us up */
     
 	return 0;
@@ -224,9 +228,10 @@ static int jiq_read_tasklet_proc_show(struct seq_file *m, void *v)
 {
 	jiq_data.m = m;              /* print in this place */
 	jiq_data.jiffies = jiffies;      /* initial time */
+	jiq_data.wait_cond = 0;
 
 	tasklet_schedule(&jiq_tasklet);
-	interruptible_sleep_on(&jiq_wait);    /* sleep till completion */
+	wait_event_interruptible(jiq_wait, jiq_data.wait_cond);    /* sleep till completion */
 
 	return 0;
 }
