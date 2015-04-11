@@ -23,6 +23,7 @@ to the longterm stable branch after linux 3.0, including:
 |linux 3.10      |June 2013 |
 |linux 3.12      |November 2013 |
 |linux 3.14      |March 2014 |
+|linux 3.18      |December 2014 |
 
 The key difference between this project and other porting attemps is that
 all these examples not only compile on the modern kernel version,
