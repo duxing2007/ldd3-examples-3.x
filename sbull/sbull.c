@@ -127,7 +127,7 @@ static void sbull_request(struct request_queue *q)
 			(unsigned)(dev - Devices), rq_data_dir(req),
 			blk_rq_pos(req), blk_rq_cur_sectors(req));
 		sbull_transfer(dev, blk_rq_pos(req), blk_rq_cur_sectors(req),
-				req->buffer, rq_data_dir(req));
+				bio_data(req->bio), rq_data_dir(req));
 		ret = 0;
 	done:
 		if(!__blk_end_request_cur(req, ret)){
