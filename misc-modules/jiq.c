@@ -188,8 +188,10 @@ static struct timer_list jiq_timer;
 
 static void jiq_timedout(unsigned long ptr)
 {
-	jiq_print((void *)ptr);            /* print a line */
+	struct clientdata *data = (void*)ptr;
+	jiq_print((void *)data);            /* print a line */
 
+	data->wait_cond = 1;
 	wake_up_interruptible(&jiq_wait);  /* awake the process */
 }
 
@@ -202,7 +204,7 @@ static int jiq_read_run_timer_proc_show(struct seq_file *m, void *v)
 
 	init_timer(&jiq_timer);              /* init the timer structure */
 	jiq_timer.function = jiq_timedout;
-	jiq_timer.data = (unsigned long)m;
+	jiq_timer.data = (unsigned long)&jiq_data;
 	jiq_timer.expires = jiffies + HZ; /* one second */
 
 	jiq_print(&jiq_data);   /* print and go to sleep */
