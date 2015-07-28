@@ -188,7 +188,7 @@ ssize_t do_short_read (struct inode *inode, struct file *filp, char __user *buf,
  */
 ssize_t short_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
-	return do_short_read(filp->f_dentry->d_inode, filp, buf, count, f_pos);
+	return do_short_read(filp->f_path.dentry->d_inode, filp, buf, count, f_pos);
 }
 
 
@@ -250,7 +250,7 @@ ssize_t do_short_write (struct inode *inode, struct file *filp, const char __use
 ssize_t short_write(struct file *filp, const char __user *buf, size_t count,
 		loff_t *f_pos)
 {
-	return do_short_write(filp->f_dentry->d_inode, filp, buf, count, f_pos);
+	return do_short_write(filp->f_path.dentry->d_inode, filp, buf, count, f_pos);
 }
 
 
