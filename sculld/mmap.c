@@ -104,7 +104,7 @@ struct vm_operations_struct sculld_vm_ops = {
 
 int sculld_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-	struct inode *inode = filp->f_dentry->d_inode;
+	struct inode *inode = filp->f_path.dentry->d_inode;
 
 	/* refuse to map if order is not 0 */
 	if (sculld_devices[iminor(inode)].order)
