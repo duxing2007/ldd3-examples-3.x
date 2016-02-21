@@ -26,6 +26,7 @@
 #include <linux/proc_fs.h>
 #include <linux/fcntl.h>	/* O_ACCMODE */
 #include <linux/aio.h>
+#include <linux/uio.h>
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
 #include "scullc.h"		/* local definitions */
@@ -429,60 +430,39 @@ struct async_work {
 static void scullc_do_deferred_op(struct work_struct *p)
 {
 	struct async_work *stuff = container_of(p, struct async_work, work.work);
-	aio_complete(stuff->iocb, stuff->result, 0);
+	stuff->iocb->ki_complete(stuff->iocb, stuff->result, 0);
 	kfree(stuff);
 }
 
 
-static int scullc_defer_op(int write, struct kiocb *iocb, const struct iovec *iov,
-		unsigned long nr_segs, loff_t pos)
+static int scullc_defer_op(int write, struct kiocb *iocb, struct iov_iter *iter)
 {
 	struct async_work *stuff;
-	int result;
 	char			*buf;
-	char			*to_copy;
-	int i;
 	size_t total;
-	size_t cur_len;
+	int result;
+	loff_t *ppos;
 
-	total = iov_length(iov, nr_segs);
+	total = iov_iter_count(iter);
+	ppos = &iocb->ki_pos;
+
 	buf = kmalloc(total, GFP_KERNEL);
 	if (unlikely(!buf))
 		return -ENOMEM;
 
+
 	/* Copy now while we can access the buffer */
 	if (write)
 	{
-		to_copy = buf;
-		for (i = 0; i < nr_segs; i++) {
-			if (unlikely(copy_from_user(to_copy, iov[i].iov_base,
-							iov[i].iov_len) != 0)) {
-				kfree(buf);
-				return -EFAULT;
-			}
-			to_copy += iov[i].iov_len;
-		}
+		result = copy_from_iter(buf, total, iter);
 
-		result = scullc_do_write(iocb->ki_filp, buf, total, &pos, 1);
+		result = scullc_do_write(iocb->ki_filp, buf, result, ppos, 1);
 	}
 	else
 	{
-		result = scullc_do_read(iocb->ki_filp, buf, total, &pos, 1);
+		result = scullc_do_read(iocb->ki_filp, buf, total, ppos, 1);
 
-		total = result;
-		to_copy = buf;
-		for (i = 0; i < nr_segs; i++) {
-			if (total <= 0)
-				break;
-
-			cur_len = min((size_t)(iov[i].iov_len), total);
-			if (copy_to_user(iov[i].iov_base, to_copy, cur_len)) {
-				kfree(buf);
-				return -EFAULT;
-			}
-			total -= cur_len;
-			to_copy += cur_len;
-		}
+		result = copy_to_iter(buf , result, iter);
 	}
 
 	kfree(buf);
@@ -503,16 +483,14 @@ static int scullc_defer_op(int write, struct kiocb *iocb, const struct iovec *io
 }
 
 
-static ssize_t scullc_aio_read(struct kiocb *iocb, const struct iovec *iov,
-		unsigned long nr_segs, loff_t pos)
+static ssize_t scullc_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
-	return scullc_defer_op(0, iocb, iov, nr_segs, pos);
+	return scullc_defer_op(0, iocb, iter);
 }
 
-static ssize_t scullc_aio_write(struct kiocb *iocb, const struct iovec *iov,
-		unsigned long nr_segs, loff_t pos)
+static ssize_t scullc_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
-	return scullc_defer_op(1, iocb, iov, nr_segs, pos);
+	return scullc_defer_op(1, iocb, iter);
 }
 
 
@@ -530,8 +508,8 @@ struct file_operations scullc_fops = {
 	.unlocked_ioctl =     scullc_ioctl,
 	.open =	     scullc_open,
 	.release =   scullc_release,
-	.aio_read =  scullc_aio_read,
-	.aio_write = scullc_aio_write,
+	.read_iter =  scullc_read_iter,
+	.write_iter = scullc_write_iter,
 };
 
 int scullc_trim(struct scullc_dev *dev)
