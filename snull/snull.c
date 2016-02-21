@@ -569,21 +569,6 @@ struct net_device_stats *snull_stats(struct net_device *dev)
 	return &priv->stats;
 }
 
-/*
- * This function is called to fill up an eth header, since arp is not
- * available on the interface
- */
-int snull_rebuild_header(struct sk_buff *skb)
-{
-	struct ethhdr *eth = (struct ethhdr *) skb->data;
-	struct net_device *dev = skb->dev;
-    
-	memcpy(eth->h_source, dev->dev_addr, dev->addr_len);
-	memcpy(eth->h_dest, dev->dev_addr, dev->addr_len);
-	eth->h_dest[ETH_ALEN-1]   ^= 0x01;   /* dest is us xor 1 */
-	return 0;
-}
-
 
 int snull_header(struct sk_buff *skb, struct net_device *dev,
                 unsigned short type, const void *daddr, const void *saddr,
@@ -637,7 +622,6 @@ static const struct net_device_ops snull_netdev_ops = {
 
 static const struct header_ops snull_header_ops = {
 	.create 	= snull_header,
-	.rebuild 	= snull_rebuild_header,
 	.cache 		= NULL,
 };
 
