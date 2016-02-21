@@ -25,7 +25,6 @@
 #include <linux/types.h>	/* size_t */
 #include <linux/proc_fs.h>
 #include <linux/fcntl.h>	/* O_ACCMODE */
-#include <linux/aio.h>
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
 #include <linux/vmalloc.h>
@@ -159,8 +158,8 @@ struct scullv_dev *scullv_follow(struct scullv_dev *dev, int n)
  * Data management: read and write
  */
 
-ssize_t scullv_do_read (struct file *filp, char __user *buf, size_t count,
-                loff_t *f_pos, int aio)
+ssize_t scullv_read (struct file *filp, char __user *buf, size_t count,
+                loff_t *f_pos)
 {
 	struct scullv_dev *dev = filp->private_data; /* the first listitem */
 	struct scullv_dev *dptr;
@@ -191,16 +190,9 @@ ssize_t scullv_do_read (struct file *filp, char __user *buf, size_t count,
 	if (count > quantum - q_pos)
 		count = quantum - q_pos; /* read only up to the end of this quantum */
 
-	if (aio) {
-		if (memcpy (buf, dptr->data[s_pos]+q_pos, count)) {
-			retval = -EFAULT;
-			goto nothing;
-		}
-	} else {
-		if (copy_to_user (buf, dptr->data[s_pos]+q_pos, count)) {
-			retval = -EFAULT;
-			goto nothing;
-		}
+	if (copy_to_user (buf, dptr->data[s_pos]+q_pos, count)) {
+		retval = -EFAULT;
+		goto nothing;
 	}
 	mutex_unlock(&dev->mutex);
 
@@ -212,15 +204,9 @@ ssize_t scullv_do_read (struct file *filp, char __user *buf, size_t count,
 	return retval;
 }
 
-ssize_t scullv_read (struct file *filp, char __user *buf, size_t count,
+
+ssize_t scullv_write (struct file *filp, const char __user *buf, size_t count,
                 loff_t *f_pos)
-{
-	return scullv_do_read(filp, buf, count, f_pos, 0);
-}
-
-
-ssize_t scullv_do_write (struct file *filp, const char __user *buf, size_t count,
-                loff_t *f_pos, int aio)
 {
 	struct scullv_dev *dev = filp->private_data;
 	struct scullv_dev *dptr;
@@ -255,16 +241,9 @@ ssize_t scullv_do_write (struct file *filp, const char __user *buf, size_t count
 	}
 	if (count > quantum - q_pos)
 		count = quantum - q_pos; /* write only up to the end of this quantum */
-	if (aio) {
-		if (memcpy (dptr->data[s_pos]+q_pos, buf, count)) {
-			retval = -EFAULT;
-			goto nomem;
-		}
-	} else {
-		if (copy_from_user (dptr->data[s_pos]+q_pos, buf, count)) {
-			retval = -EFAULT;
-			goto nomem;
-		}
+	if (copy_from_user (dptr->data[s_pos]+q_pos, buf, count)) {
+		retval = -EFAULT;
+		goto nomem;
 	}
 	*f_pos += count;
  
@@ -280,11 +259,6 @@ ssize_t scullv_do_write (struct file *filp, const char __user *buf, size_t count
 }
 
 
-ssize_t scullv_write (struct file *filp, const char __user *buf, size_t count,
-                loff_t *f_pos)
-{
-	return scullv_do_write(filp, buf, count, f_pos, 0);
-}
 
 /*
  * The ioctl() implementation
@@ -422,97 +396,9 @@ struct async_work {
 	struct delayed_work work;
 };
 
-/*
- * "Complete" an asynchronous operation.
- */
-static void scullv_do_deferred_op(struct work_struct *p)
-{
-	struct async_work *stuff = container_of(p, struct async_work, work.work);
-	aio_complete(stuff->iocb, stuff->result, 0);
-	kfree(stuff);
-}
 
 
-static int scullv_defer_op(int write, struct kiocb *iocb, const struct iovec *iov,
-		unsigned long nr_segs, loff_t pos)
-{
-	struct async_work *stuff;
-	int result;
-	char			*buf;
-	char			*to_copy;
-	int i;
-	size_t total;
-	size_t cur_len;
 
-	total = iov_length(iov, nr_segs);
-	buf = kmalloc(total, GFP_KERNEL);
-	if (unlikely(!buf))
-		return -ENOMEM;
-
-	/* Copy now while we can access the buffer */
-	if (write)
-	{
-		to_copy = buf;
-		for (i = 0; i < nr_segs; i++) {
-			if (unlikely(copy_from_user(to_copy, iov[i].iov_base,
-							iov[i].iov_len) != 0)) {
-				kfree(buf);
-				return -EFAULT;
-			}
-			to_copy += iov[i].iov_len;
-		}
-
-		result = scullv_do_write(iocb->ki_filp, buf, total, &pos, 1);
-	}
-	else
-	{
-		result = scullv_do_read(iocb->ki_filp, buf, total, &pos, 1);
-
-		total = result;
-		to_copy = buf;
-		for (i = 0; i < nr_segs; i++) {
-			if (total <= 0)
-				break;
-
-			cur_len = min((size_t)(iov[i].iov_len), total);
-			if (copy_to_user(iov[i].iov_base, to_copy, cur_len)) {
-				kfree(buf);
-				return -EFAULT;
-			}
-			total -= cur_len;
-			to_copy += cur_len;
-		}
-	}
-
-	kfree(buf);
-
-	/* If this is a synchronous IOCB, we return our status now. */
-	if (is_sync_kiocb(iocb))
-		return result;
-
-	/* Otherwise defer the completion for a few milliseconds. */
-	stuff = kmalloc (sizeof (*stuff), GFP_KERNEL);
-	if (stuff == NULL)
-		return result; /* No memory, just complete now */
-	stuff->iocb = iocb;
-	stuff->result = result;
-	INIT_DELAYED_WORK(&stuff->work, scullv_do_deferred_op);
-	schedule_delayed_work(&stuff->work, HZ/100);
-	return -EIOCBQUEUED;
-}
-
-
-static ssize_t scullv_aio_read(struct kiocb *iocb, const struct iovec *iov,
-		unsigned long nr_segs, loff_t pos)
-{
-	return scullv_defer_op(0, iocb, iov, nr_segs, pos);
-}
-
-static ssize_t scullv_aio_write(struct kiocb *iocb, const struct iovec *iov,
-		unsigned long nr_segs, loff_t pos)
-{
-	return scullv_defer_op(1, iocb, iov, nr_segs, pos);
-}
 
 
  
@@ -535,8 +421,6 @@ struct file_operations scullv_fops = {
 	.mmap =	     scullv_mmap,
 	.open =	     scullv_open,
 	.release =   scullv_release,
-	.aio_read =  scullv_aio_read,
-	.aio_write = scullv_aio_write,
 };
 
 int scullv_trim(struct scullv_dev *dev)
