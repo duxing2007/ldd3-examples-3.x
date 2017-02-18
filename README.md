@@ -1,24 +1,3 @@
-Advertisement
-=================
-腾讯诚招PHP后台、C++后台、Android终端、IOS终端
-
-有意者邮件522069228(@)qq.com
-
-长期有效
-
-PHP后台
-http://hr.tencent.com/position_detail.php?id=21921
-
-C++后台
-http://hr.tencent.com/position_detail.php?id=16499
-
-Android终端
-http://hr.tencent.com/position_detail.php?id=17212
-
-IOS终端
-http://hr.tencent.com/position_detail.php?id=16916
-
-
 ldd3-examples-3.x
 =================
 
@@ -46,6 +25,7 @@ to the longterm stable branch after linux 3.0, including:
 |linux 3.14      |March 2014 |
 |linux 3.18      |December 2014 |
 |linux 4.1       |June 2015 |
+|linux 4.4       |January 2016 |
 
 The key difference between this project and other porting attemps is that
 all these examples not only compile on the modern kernel version,
