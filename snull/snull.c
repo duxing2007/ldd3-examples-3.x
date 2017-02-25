@@ -521,7 +521,6 @@ int snull_tx(struct sk_buff *skb, struct net_device *dev)
 		len = ETH_ZLEN;
 		data = shortpkt;
 	}
-	dev->trans_start = jiffies; /* save the timestamp */
 
 	/* Remember the skb, so we can free it at interrupt time */
 	priv->skb = skb;
@@ -540,7 +539,7 @@ void snull_tx_timeout (struct net_device *dev)
 	struct snull_priv *priv = netdev_priv(dev);
 
 	PDEBUG("Transmit timeout at %ld, latency %ld\n", jiffies,
-			jiffies - dev->trans_start);
+			jiffies - netdev_get_tx_queue(dev, 0)->trans_start);
         /* Simulate a transmission interrupt to get things moving */
 	priv->status = SNULL_TX_INTR;
 	snull_interrupt(0, dev, NULL);
