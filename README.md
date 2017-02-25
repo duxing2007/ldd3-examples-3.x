@@ -26,6 +26,7 @@ to the longterm stable branch after linux 3.0, including:
 |linux 3.18      |December 2014 |
 |linux 4.1       |June 2015 |
 |linux 4.4       |January 2016 |
+|linux 4.9       |December 2016 |
 
 The key difference between this project and other porting attemps is that
 all these examples not only compile on the modern kernel version,
@@ -80,4 +81,8 @@ c. gdb/qemu.
    compile busybox+linux running in qemu, load buggy module, use gdb to debug it.
    Embedded Linux From Scratch is useful when doing such tasks, refer to
    http://free-electrons.com/docs/elfs/.
+
+Update Ubuntu kernel.
+-----------------
+download from http://kernel.ubuntu.com/~kernel-ppa/mainline/.
 
