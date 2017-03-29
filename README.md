@@ -1,7 +1,7 @@
 ldd3-examples-3.x
 =================
 
-port of the ldd3 source code examples to linux 3.x
+port of the ldd3 source code examples after linux 3.x
 
 Backgroud
 =================
