@@ -98,12 +98,11 @@ static int simple_remap_mmap(struct file *filp, struct vm_area_struct *vma)
 /*
  * The fault version.
  */
-int simple_vma_fault(struct vm_area_struct *vma,
-                struct vm_fault *vmf)
+int simple_vma_fault(struct vm_fault *vmf)
 {
 	struct page *pageptr;
-	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-	unsigned long physaddr = (unsigned long)(vmf->address - vma->vm_start) + offset;
+	unsigned long offset = vmf->vma->vm_pgoff << PAGE_SHIFT;
+	unsigned long physaddr = (unsigned long)(vmf->address - vmf->vma->vm_start) + offset;
 	unsigned long pageframe = physaddr >> PAGE_SHIFT;
 
 // Eventually remove these printks
