@@ -20,6 +20,7 @@
 #include <linux/kernel.h>	/* printk(), min() */
 #include <linux/slab.h>		/* kmalloc() */
 #include <linux/sched.h>
+#include <linux/sched/signal.h>
 #include <linux/fs.h>		/* everything... */
 #include <linux/proc_fs.h>
 #include <linux/errno.h>	/* error codes */

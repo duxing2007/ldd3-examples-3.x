@@ -57,16 +57,15 @@ void scullp_vma_close(struct vm_area_struct *vma)
  * is individually decreased, and would drop to 0.
  */
 
-int scullp_vma_fault(struct vm_area_struct *vma,
-                                struct vm_fault *vmf)
+int scullp_vma_fault(struct vm_fault *vmf)
 {
 	unsigned long offset;
-	struct scullp_dev *ptr, *dev = vma->vm_private_data;
+	struct scullp_dev *ptr, *dev = vmf->vma->vm_private_data;
 	struct page *page = NULL;
 	void *pageptr = NULL; /* default to "missing" */
 
 	mutex_lock(&dev->mutex);
-	offset = (unsigned long)(vmf->address - vma->vm_start) + (vma->vm_pgoff << PAGE_SHIFT);
+	offset = (unsigned long)(vmf->address - vmf->vma->vm_start) + (vmf->vma->vm_pgoff << PAGE_SHIFT);
 	if (offset >= dev->size) goto out; /* out of range */
 
 	/*
