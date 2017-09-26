@@ -1,5 +1,6 @@
 Source code layout.
 -----------------
+```
 .
 ├── Chapter 2
 │   ├── hello.c
@@ -120,3 +121,4 @@ Source code layout.
         ├── Makefile
         ├── tiny_serial.c
         └── tiny_tty.c
+```
