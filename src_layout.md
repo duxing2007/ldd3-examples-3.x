@@ -25,20 +25,13 @@ Source code layout.
 │   ├── jit.c
 │   └── load50.c
 ├── Chapter 8
-│   ├── scullc
-│   │   ├── Makefile
-│   │   ├── main.c
-│   │   ├── mmap.c
-│   │   ├── scullc.h
-│   │   ├── scullc_load
-│   │   └── scullc_unload
-│   └── scullp
-│       ├── Makefile
-│       ├── main.c
-│       ├── mmap.c
-│       ├── scullp.h
-│       ├── scullp_load
-│       └── scullp_unload
+│   └── scullc
+│       ├── Makefile
+│       ├── main.c
+│       ├── mmap.c
+│       ├── scullc.h
+│       ├── scullc_load
+│       └── scullc_unload
 ├── Chapter 9
 │   ├── inp.c
 │   ├── outp.c
@@ -96,11 +89,18 @@ Source code layout.
 │   │   ├── scullv.h
 │   │   ├── scullv_load
 │   │   └── scullv_unload
-│   └── simple
+│   ├── simple
+│   │   ├── Makefile
+│   │   ├── simple.c
+│   │   ├── simple_load
+│   │   └── simple_unload
+│   └── scullp
 │       ├── Makefile
-│       ├── simple.c
-│       ├── simple_load
-│       └── simple_unload
+│       ├── main.c
+│       ├── mmap.c
+│       ├── scullp.h
+│       ├── scullp_load
+│       └── scullp_unload
 ├── Chapter 16
 │   └── sbull
 │       ├── Makefile
