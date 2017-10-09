@@ -28,7 +28,7 @@
 #include <linux/aio.h>
 #include <linux/uio.h>
 #include <linux/seq_file.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include "scullc.h"		/* local definitions */
 
 
