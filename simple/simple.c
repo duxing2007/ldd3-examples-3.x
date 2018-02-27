@@ -103,7 +103,7 @@ int simple_vma_fault(struct vm_area_struct *vma,
 {
 	struct page *pageptr;
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-	unsigned long physaddr = (unsigned long)(vmf->address - vma->vm_start) + offset;
+	unsigned long physaddr = (unsigned long)(vmf->virtual_address - vma->vm_start) + offset;
 	unsigned long pageframe = physaddr >> PAGE_SHIFT;
 
 // Eventually remove these printks

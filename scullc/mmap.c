@@ -65,7 +65,7 @@ int scullc_vma_fault(struct vm_area_struct *vma,
 	void *pageptr = NULL; /* default to "missing" */
 
 	mutex_lock(&dev->mutex);
-	offset = (unsigned long)(vmf->address - vma->vm_start) + (vma->vm_pgoff << PAGE_SHIFT);
+	offset = (unsigned long)(vmf->virtual_address - vma->vm_start) + (vma->vm_pgoff << PAGE_SHIFT);
 	if (offset >= dev->size) goto out; /* out of range */
 
 	/*
