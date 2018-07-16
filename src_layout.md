@@ -6,7 +6,15 @@ Source code layout.
 │   ├── hello.c
 │   └── hellop.c
 ├── Chapter 3
-│   └── scull.c
+│   └── scull
+│       ├── access.c
+│       ├── main.c
+│       ├── Makefile
+│       ├── pipe.c
+│       ├── scull.h
+│       ├── scull.init
+│       ├── scull_load
+│       └── scull_unload
 ├── Chapter 4
 │   ├── faulty.c
 │   ├── gdbline
