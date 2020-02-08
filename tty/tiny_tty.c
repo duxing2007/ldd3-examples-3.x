@@ -40,7 +40,7 @@ MODULE_LICENSE("GPL");
 #define DELAY_TIME		HZ * 2	/* 2 seconds per character */
 #define TINY_DATA_CHARACTER	't'
 
-#define TINY_TTY_MAJOR		240	/* experimental range */
+#define TINY_TTY_MAJOR		0	/* experimental range */
 #define TINY_TTY_MINORS		4	/* only have 4 devices */
 
 struct tiny_serial {
@@ -490,19 +490,6 @@ static int tiny_ioctl(struct tty_struct *tty,
 	return -ENOIOCTLCMD;
 }
 
-static int tiny_tty_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, tiny_tty_proc_show, NULL);
-}
-
-static const struct file_operations tiny_tty_proc_fops = {
-	.owner		= THIS_MODULE,
-	.open		= tiny_tty_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
 static struct tty_operations serial_ops = {
 	.open = tiny_open,
 	.close = tiny_close,
@@ -512,7 +499,7 @@ static struct tty_operations serial_ops = {
 	.tiocmget = tiny_tiocmget,
 	.tiocmset = tiny_tiocmset,
 	.ioctl = tiny_ioctl,
-	.proc_fops       = &tiny_tty_proc_fops,
+	.proc_show       = tiny_tty_proc_show,
 };
 
 static const struct tty_port_operations tiny_port_ops = {
@@ -548,9 +535,10 @@ static int __init tiny_init(void)
 	/* register the tty driver */
 	retval = tty_register_driver(tiny_tty_driver);
 	if (retval) {
-		printk(KERN_ERR "failed to register tiny tty driver");
+		printk(KERN_ERR "failed to register tiny tty driver, retval=%d", retval);
 		goto err_tty_register_driver;
 	}
+	printk(KERN_ERR "register success. major=%d", tiny_tty_driver->major);
 
 	for (i = 0; i < TINY_TTY_MINORS; ++i) {
 		/* let's create it */
@@ -609,7 +597,6 @@ static void __exit tiny_exit(void)
 		if(tiny->port.count)
 			tiny_shutdown(&tiny->port);
 
-		del_timer(&tiny->timer);
 		tty_port_destroy(&tiny->port);
 		kfree(tiny);
 		tiny_table[i] = NULL;
