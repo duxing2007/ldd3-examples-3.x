@@ -42,7 +42,14 @@ MODULE_LICENSE("GPL");
 
 #define MY_NAME			TINY_SERIAL_NAME
 
-static struct timer_list *timer;
+struct port_data {
+	struct timer_list timer;
+	struct uart_port* port;
+};
+
+struct port_data tiny_port_data = {
+	.port = NULL,
+};
 
 static void tiny_stop_tx(struct uart_port *port)
 {
@@ -92,13 +99,13 @@ static void tiny_start_tx(struct uart_port *port)
 {
 }
 
-static void tiny_timer(unsigned long data)
+static void tiny_timer(struct timer_list* arg)
 {
 	struct uart_port *port;
 	struct tty_port *tport;
 
 
-	port = (struct uart_port *)data;
+	port = tiny_port_data.port;
 	if (!port)
 		return;
 	if (!port->state)
@@ -112,8 +119,8 @@ static void tiny_timer(unsigned long data)
 	tty_flip_buffer_push(tport);
 
 	/* resubmit the timer again */
-	timer->expires = jiffies + DELAY_TIME;
-	add_timer(timer);
+	tiny_port_data.timer.expires = jiffies + DELAY_TIME;
+	add_timer(&tiny_port_data.timer);
 
 	/* see if we have any data to transmit */
 	tiny_tx_chars(port);
@@ -192,16 +199,11 @@ static int tiny_startup(struct uart_port *port)
 	/* do any hardware initialization needed here */
 
 	/* create our timer and submit it */
-	if (!timer) {
-		timer = kmalloc(sizeof(*timer), GFP_KERNEL);
-		if (!timer)
-			return -ENOMEM;
-		init_timer(timer);
-	}
-	timer->data = (unsigned long)port;
-	timer->expires = jiffies + DELAY_TIME;
-	timer->function = tiny_timer;
-	add_timer(timer);
+	tiny_port_data.port = port;
+	timer_setup(&tiny_port_data.timer, tiny_timer, 0);
+
+	tiny_port_data.timer.expires = jiffies + DELAY_TIME;
+	add_timer(&tiny_port_data.timer);
 	return 0;
 }
 
@@ -211,7 +213,7 @@ static void tiny_shutdown(struct uart_port *port)
 	/* Do any hardware specific stuff here */
 
 	/* shut down our timer */
-	del_timer(timer);
+	del_timer(&tiny_port_data.timer);
 }
 
 static const char *tiny_type(struct uart_port *port)

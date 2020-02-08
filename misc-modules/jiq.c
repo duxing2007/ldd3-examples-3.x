@@ -60,6 +60,7 @@ static DECLARE_WAIT_QUEUE_HEAD (jiq_wait);
  * Keep track of info we need between task queue runs.
  */
 static struct clientdata {
+	struct timer_list jiq_timer;
 	struct seq_file *m;
 	unsigned long jiffies;
 	long delay;
@@ -184,11 +185,10 @@ DEFINE_PROC_SEQ_FILE(jiq_read_wq_delayed)
  * This one, instead, tests out the timers.
  */
 
-static struct timer_list jiq_timer;
 
-static void jiq_timedout(unsigned long ptr)
+static void jiq_timedout(struct timer_list* arg)
 {
-	struct clientdata *data = (void*)ptr;
+	struct clientdata *data = from_timer(data, arg, jiq_timer);
 	jiq_print((void *)data);            /* print a line */
 
 	data->wait_cond = 1;
@@ -202,15 +202,13 @@ static int jiq_read_run_timer_proc_show(struct seq_file *m, void *v)
 	jiq_data.jiffies = jiffies;
 	jiq_data.wait_cond = 0;
 
-	init_timer(&jiq_timer);              /* init the timer structure */
-	jiq_timer.function = jiq_timedout;
-	jiq_timer.data = (unsigned long)&jiq_data;
-	jiq_timer.expires = jiffies + HZ; /* one second */
+	timer_setup(&jiq_data.jiq_timer, jiq_timedout, 0);
+	jiq_data.jiq_timer.expires = jiffies + HZ; /* one second */
 
 	jiq_print(&jiq_data);   /* print and go to sleep */
-	add_timer(&jiq_timer);
+	add_timer(&jiq_data.jiq_timer);
 	wait_event_interruptible(jiq_wait, jiq_data.wait_cond);  /* RACE */
-	del_timer_sync(&jiq_timer);  /* in case a signal woke us up */
+	del_timer_sync(&jiq_data.jiq_timer);  /* in case a signal woke us up */
     
 	return 0;
 }

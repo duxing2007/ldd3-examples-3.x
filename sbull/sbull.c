@@ -274,9 +274,9 @@ int sbull_revalidate(struct gendisk *gd)
  * The "invalidate" function runs out of the device timer; it sets
  * a flag to simulate the removal of the media.
  */
-void sbull_invalidate(unsigned long ldev)
+void sbull_invalidate(struct timer_list* arg)
 {
-	struct sbull_dev *dev = (struct sbull_dev *) ldev;
+	struct sbull_dev *dev = from_timer(dev, arg, timer);
 
 	spin_lock(&dev->lock);
 	if (dev->users || !dev->data) 
@@ -354,9 +354,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 	/*
 	 * The timer which "invalidates" the device.
 	 */
-	init_timer(&dev->timer);
-	dev->timer.data = (unsigned long) dev;
-	dev->timer.function = sbull_invalidate;
+	timer_setup(&dev->timer, sbull_invalidate, 0);
 	
 	/*
 	 * The I/O queue, depending on whether we are using our own

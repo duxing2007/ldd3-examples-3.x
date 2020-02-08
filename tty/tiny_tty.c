@@ -46,7 +46,7 @@ MODULE_LICENSE("GPL");
 struct tiny_serial {
 	struct tty_port	port;		/* pointer to the tty for this device */
 	struct mutex	port_write_mutex;
-	struct timer_list	*timer;
+	struct timer_list	timer;
 
 	/* for tiocmget and tiocmset functions */
 	int			msr;		/* MSR shadow */
@@ -61,9 +61,9 @@ struct tiny_serial {
 static struct tiny_serial *tiny_table[TINY_TTY_MINORS];	/* initially all NULL */
 
 
-static void tiny_timer(unsigned long timer_data)
+static void tiny_timer(struct timer_list* arg)
 {
-	struct tiny_serial *tiny = (struct tiny_serial *)timer_data;
+	struct tiny_serial *tiny = from_timer(tiny, arg, timer);
 	struct tty_port *port;
 	int i;
 	char data[1] = {TINY_DATA_CHARACTER};
@@ -85,8 +85,8 @@ static void tiny_timer(unsigned long timer_data)
 	tty_flip_buffer_push(port);
 
 	/* resubmit the timer again */
-	tiny->timer->expires = jiffies + DELAY_TIME;
-	add_timer(tiny->timer);
+	tiny->timer.expires = jiffies + DELAY_TIME;
+	add_timer(&tiny->timer);
 }
 
 /*
@@ -96,23 +96,12 @@ static void tiny_timer(unsigned long timer_data)
 static int tiny_activate(struct tty_port *tport, struct tty_struct *tty)
 {
 	struct tiny_serial *tiny;
-	struct timer_list *timer;
 
 	tiny = container_of(tport, struct tiny_serial, port);
 
-	/* create our timer and submit it */
-	if (!tiny->timer) {
-		timer = kmalloc(sizeof(*timer), GFP_KERNEL);
-		if (!timer) {
-			return -ENOMEM;
-		}
-		init_timer(timer);
-		tiny->timer = timer;
-	}
-	tiny->timer->data = (unsigned long )tiny;
-	tiny->timer->expires = jiffies + DELAY_TIME;
-	tiny->timer->function = tiny_timer;
-	add_timer(tiny->timer);
+	timer_setup(&tiny->timer, tiny_timer, 0);
+	tiny->timer.expires = jiffies + DELAY_TIME;
+	add_timer(&tiny->timer);
 	return 0;
 }
 
@@ -126,7 +115,7 @@ static void tiny_shutdown(struct tty_port *tport){
 	tiny = container_of(tport, struct tiny_serial, port);
 
 	/* shut down our timer */
-	del_timer(tiny->timer);
+	del_timer(&tiny->timer);
 }
 
 static int tiny_open(struct tty_struct *tty, struct file *file)
@@ -573,7 +562,6 @@ static int __init tiny_init(void)
 		}
 
 		mutex_init(&tiny->port_write_mutex);
-		tiny->timer = NULL;
 
 		tiny_table[i] = tiny;
 		tty_port_init(&tiny->port);
@@ -621,11 +609,7 @@ static void __exit tiny_exit(void)
 		if(tiny->port.count)
 			tiny_shutdown(&tiny->port);
 
-		/* shut down our timer and free the memory */
-		if(tiny->timer) {
-			del_timer(tiny->timer);
-			kfree(tiny->timer);
-		}
+		del_timer(&tiny->timer);
 		tty_port_destroy(&tiny->port);
 		kfree(tiny);
 		tiny_table[i] = NULL;
