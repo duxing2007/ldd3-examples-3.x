@@ -147,11 +147,11 @@ static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
 
 	/* Do each segment independently. */
 	bio_for_each_segment(bvec, bio, iter) {
-		char *buffer = __bio_kmap_atomic(bio, iter);
+		char *buffer = kmap_atomic(bvec.bv_page) + bvec.bv_offset;
 		sbull_transfer(dev, sector,bytes_to_sectors_checked(bio_cur_bytes(bio)),
 				buffer, bio_data_dir(bio) == WRITE);
 		sector += (bytes_to_sectors_checked(bio_cur_bytes(bio)));
-		__bio_kunmap_atomic(bio);
+		kunmap_atomic(buffer);
 	}
 	return 0; /* Always "succeed" */
 }
