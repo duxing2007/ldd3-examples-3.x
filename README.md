@@ -28,6 +28,8 @@ to the longterm stable branch after linux 3.0, including:
 |linux 4.1       |June 2015 |
 |linux 4.4       |January 2016 |
 |linux 4.9       |December 2016 |
+|linux 4.14      |November 2017 |
+|linux 4.19      |October 2018 |
 
 The key difference between this project and other porting attemps is that
 all these examples not only compile on the modern kernel version,

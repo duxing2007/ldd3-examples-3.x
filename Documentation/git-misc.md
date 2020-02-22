@@ -1,6 +1,6 @@
 # push branch
 ```
-	git push origin origin/linux-3.18.y:origin/linux-3.18.y
+	git push origin linux-3.18.y:linux-3.18.y
 ```
 
 # push tags
