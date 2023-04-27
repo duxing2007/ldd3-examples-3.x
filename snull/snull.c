@@ -626,7 +626,7 @@ static const struct header_ops snull_header_ops = {
 
 /*
  * The init function (sometimes called probe).
- * It is invoked by register_netdev()
+ * It is invoked by alloc_netdev()
  */
 void snull_init(struct net_device *dev)
 {
